@@ -3,6 +3,8 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ProfileController;
 
 /*
 |--------------------------------------------------------------------------
@@ -24,8 +26,24 @@ Route::get('/', function () {
     ]);
 });
 
-Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'create'])->middleware(['auth', 'verified'])->name('dashboard');
 
-require __DIR__.'/auth.php';
+Route::post('/classroom/create', [DashboardController::class, 'createClassroom'])
+    ->middleware(['auth', 'verified'])
+    ->name('classroom.create');
+
+Route::post('/classroom/join', [DashboardController::class, 'joinClassroom'])
+    ->middleware(['auth', 'verified'])
+    ->name('classroom.join');
+
+Route::get('/user/profile', [ProfileController::class, 'create'])->middleware(['auth', 'verified'])->name('user.profile');
+
+Route::post('/user/update', [ProfileController::class, 'update'])
+    ->middleware(['auth', 'verified'])
+    ->name('user.update');
+
+Route::post('/user/password', [ProfileController::class, 'changePassword'])
+    ->middleware(['auth', 'verified'])
+    ->name('user.password');
+
+require __DIR__ . '/auth.php';
