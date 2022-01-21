@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ClassroomController;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,5 +46,26 @@ Route::post('/user/update', [ProfileController::class, 'update'])
 Route::post('/user/password', [ProfileController::class, 'changePassword'])
     ->middleware(['auth', 'verified'])
     ->name('user.password');
+
+Route::get('/classrooms/{id}', [ClassroomController::class, 'create'])
+    ->middleware(['auth', 'verified']);
+
+Route::post('/classrooms/{id}', [ClassroomController::class, 'update'])
+    ->middleware(['auth', 'verified'])->name('classroom.update');
+
+Route::post('/classrooms/{classroom}/assignments', [ClassroomController::class, 'addAssignment'])
+    ->middleware(['auth', 'verified'])->name('assignment.add');
+
+Route::delete('/assignments/{assignment}', [ClassroomController::class, 'deleteAssignment'])
+    ->middleware(['auth', 'verified'])->name('assignment.delete');
+
+Route::post('/assignments/{assignment}/submissions', [ClassroomController::class, 'addSubmission'])
+    ->middleware(['auth', 'verified'])->name('submission.add');
+
+Route::post('/classrooms/{classroom}/materials', [ClassroomController::class, 'addMaterial'])
+    ->middleware(['auth', 'verified'])->name('material.add');
+
+Route::delete('/materials/{material}', [ClassroomController::class, 'deleteMaterial'])
+    ->middleware(['auth', 'verified'])->name('material.delete');
 
 require __DIR__ . '/auth.php';

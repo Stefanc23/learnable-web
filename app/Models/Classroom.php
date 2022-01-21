@@ -20,4 +20,12 @@ class Classroom extends Model
     {
         return $this->belongsToMany(User::class, 'class_attendees')->withPivot('role');
     }
+
+    public function assignments() {
+        return $this->hasMany(Assignment::class);
+    }
+
+    public function materials() {
+        return $this->hasMany(Material::class);
+    }
 }
