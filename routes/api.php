@@ -2,6 +2,9 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\API\AuthController;
+use App\Http\Controllers\API\UserController;
+use App\Http\Controllers\API\ClassroomController;
 
 /*
 |--------------------------------------------------------------------------
@@ -14,6 +17,25 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
+Route::group(['prefix' => 'auth'], function () {
+    Route::post('login', [AuthController::class, 'login']);
+    Route::post('register', [AuthController::class, 'register']);
+    Route::group(['middleware' => 'auth:sanctum'], function () {
+        Route::post('logout', [AuthController::class, 'logout']);
+        Route::post('logoutall', [AuthController::class, 'logoutAll']);
+    });
+});
+
+Route::group(['middleware' => 'auth:sanctum'], function () {
+    Route::get('/user', [UserController::class, 'index']);
+    Route::post('/user', [UserController::class, 'update']);
+    Route::get('/classroom', [ClassroomController::class, 'index']);
+    Route::post('/classroom', [ClassroomController::class, 'create']);
+    Route::group(['prefix' => 'classroom'], function () {
+        Route::post('/attendees', [ClassroomController::class, 'getAttendees']);
+        Route::post('/join', [ClassroomController::class, 'join']);
+        Route::post('/update', [ClassroomController::class, 'update']);
+        Route::post('/dismiss', [ClassroomController::class, 'dismissStudent']);
+        Route::post('/delete', [ClassroomController::class, 'delete']);
+    });
 });
