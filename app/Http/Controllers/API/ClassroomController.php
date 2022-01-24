@@ -18,14 +18,7 @@ class ClassroomController extends Controller
         ], 200);
     }
 
-    public function getAttendees(Request $request)
-    {
-        return response([
-            'attendees' => Classroom::find($request->id)->classAttendees
-        ], 200);
-    }
-
-    public function create(Request $request)
+    public function store(Request $request)
     {
         $attrs = $request->validate([
             'name' => 'required|max:255',
@@ -57,37 +50,16 @@ class ClassroomController extends Controller
         ], 200);
     }
 
-    public function join(Request $request)
+    public function show($classroomId)
     {
-        $attrs = $request->validate([
-            'classroom_id' => 'required|string',
-            'invite_code' => 'required|string|max:255',
-        ]);
-
-        $classroom = Classroom::find($attrs['classroom_id']);
-
-        if ($classroom != null) {
-            if ($classroom->invite_code == $attrs['invite_code']) {
-                ClassAttendee::create([
-                    'user_id' => Auth::id(),
-                    'classroom_id' => $classroom->id,
-                    'role' => 'Student'
-                ]);
-
-                return response([
-                    'classroom' => Classroom::with('classAttendees')->find($classroom->id)
-                ], 200);
-            }
-        }
-
         return response([
-            'message' => 'Invalid credentials.',
-        ], 401);
+            'classroom' => Classroom::find($classroomId)
+        ], 200);
     }
 
-    public function update(Request $request)
+    public function update(Request $request, $classroomId)
     {
-        $classroom = Classroom::find($request->id);
+        $classroom = Classroom::find($classroomId);
 
         $attrs = $request->validate([
             'name' => 'required|string|max:255',
@@ -117,24 +89,14 @@ class ClassroomController extends Controller
         ], 200);
     }
 
-    public function dismissStudent(Request $request)
+    public function destroy($classroomId)
     {
-        ClassAttendee::where('user_id', '=', $request['user_id'])->where('classroom_id', '=', $request['classroom_id'])->delete();
-
-        return response([
-            'message' => 'Student dismissed.',
-            'classroom' => Classroom::with('classAttendees')->find($request['classroom_id'])
-        ], 200);
-    }
-
-    public function delete(Request $request)
-    {
-        $classAttendees = ClassAttendee::where('classroom_id', '=', $request['classroom_id']);
+        $classAttendees = ClassAttendee::where('classroom_id', '=', $classroomId);
         foreach ($classAttendees as $classAttendee) {
             $classAttendee->delete();
         }
 
-        $classroom =  Classroom::find($request['classroom_id']);
+        $classroom =  Classroom::find($classroomId);
         if (Storage::exists($classroom->banner_image_file_path)) {
             Storage::delete($classroom->banner_image_file_path);
         }
@@ -142,6 +104,36 @@ class ClassroomController extends Controller
 
         return response([
             'message' => 'Class deleted.',
+        ], 200);
+    }
+
+    public function join($classroomId, $inviteCode)
+    {
+        $classroom = Classroom::find($classroomId);
+
+        if ($classroom != null) {
+            if ($classroom->invite_code == $inviteCode) {
+                ClassAttendee::create([
+                    'user_id' => Auth::id(),
+                    'classroom_id' => $classroom->id,
+                    'role' => 'Student'
+                ]);
+
+                return response([
+                    'classroom' => Classroom::with('classAttendees')->find($classroom->id)
+                ], 200);
+            }
+        }
+
+        return response([
+            'message' => 'Invalid credentials.',
+        ], 401);
+    }
+
+    public function getAttendees($classroomId)
+    {
+        return response([
+            'attendees' => Classroom::find($classroomId)->classAttendees
         ], 200);
     }
 }
