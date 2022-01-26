@@ -7,7 +7,6 @@ use Illuminate\Http\Request;
 use App\Models\Classroom;
 use App\Models\Assignment;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Storage;
 
 class AssignmentController extends Controller
 {
@@ -25,9 +24,23 @@ class AssignmentController extends Controller
             'deadline' => 'required'
         ]);
 
+        $bucket = app('firebase.storage')->getBucket();
+        $storage_path = 'assignments/';
         $assignment = $request->file('assignment');
-        $assignment_file_path = 'assignment-' . $attrs['title'] . '-' . time() . '.' . $assignment->getClientOriginalExtension();
-        $assignment_file_path = $assignment->storeAs('assignments', $assignment_file_path);
+        $assignment_file_name = 'assignment-' . $attrs['title'] . '-' . time() . '.' . $assignment->getClientOriginalExtension();
+        $assignment_file_path =  $storage_path . $assignment_file_name;
+
+        $localfolder = public_path('firebase-temp-uploads') . '/';
+
+        if ($assignment->move($localfolder, $assignment_file_name)) {
+            $uploadedfile = fopen($localfolder . $assignment_file_name, 'r');
+
+            $bucket->upload($uploadedfile, ['name' => $assignment_file_path]);
+
+            unlink($localfolder . $assignment_file_name);
+        } else {
+            abort(500);
+        }
 
         $assignment = Assignment::create([
             'title' => $attrs['title'],
@@ -35,7 +48,7 @@ class AssignmentController extends Controller
             'assignment_file_path' => $assignment_file_path,
             'classroom_id' => $classroomId
         ]);
-        
+
         return response([
             'assignment' => $assignment
         ], 200);
@@ -51,9 +64,16 @@ class AssignmentController extends Controller
     public function destroy($assignmentId)
     {
         $assignment = Assignment::find($assignmentId);
-        if (Storage::exists($assignment->assignment_file_path)) {
-            Storage::delete($assignment->assignment_file_path);
+
+        $bucket = app('firebase.storage')->getBucket();
+
+        if ($assignment->assignment_file_path != NULL) {
+            $file = $bucket->object($assignment->assignment_file_path);
+            if ($file->exists()) {
+                $file->delete();
+            }
         }
+
         $assignment->delete();
 
         return response([

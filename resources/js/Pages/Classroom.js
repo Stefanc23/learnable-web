@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Authenticated from "@/Layouts/Authenticated";
 import { Head, useForm, Link } from "@inertiajs/inertia-react";
 import { thumbnailImage, avatarImage } from "@/images";
@@ -13,18 +13,24 @@ import moment from "moment";
 import {
     faCog,
     faPlus,
-    faDownload,
     faTrash,
     faUpload,
     faHistory,
     faClipboardList,
 } from "@fortawesome/free-solid-svg-icons";
 import { CopyToClipboard } from "react-copy-to-clipboard";
+import storage from "@/firebase";
+import Skeleton from "react-loading-skeleton";
+import "react-loading-skeleton/dist/skeleton.css";
+import DownloadButton from "@/Components/DownloadButton";
+import AttendeeAvatar from "@/Components/AttendeeAvatar";
 
 export default function Classroom({ classroom, assignments, ...props }) {
     const [selectedAssignmentId, setSelectedAssignmentId] = useState(0);
     const [selectedAssignmentIndex, setSelectedAssignmentIndex] = useState(0);
     const [selectedBanner, setSelectedBanner] = useState(null);
+    const [bannerImage, setBannerImage] = useState(null);
+    const [bannerLoaded, setBannerLoaded] = useState(false);
 
     const { data, setData, post, processing, errors, reset } = useForm({
         name: classroom.name,
@@ -37,16 +43,28 @@ export default function Classroom({ classroom, assignments, ...props }) {
         material: null,
     });
 
+    useEffect(() => {
+        if (classroom.banner_image_file_path != null) {
+            storage
+                .ref(classroom.banner_image_file_path)
+                .getDownloadURL()
+                .then((url) => {
+                    setBannerImage(url);
+                });
+        }
+    }, [classroom]);
+
     function editClassroomSubmit(e) {
         e.preventDefault();
-        post(route("classroom.update", { id: classroom.id }));
+        post(route("classroom.update", { id: classroom.id }), {
+            onSuccess: () => reset(),
+        });
     }
 
     function addAssignmentSubmit(e) {
         e.preventDefault();
         post(route("assignment.add", { classroom: classroom.id }), {
-            preserveScroll: true,
-            onSuccess: () => form.reset("title"),
+            onSuccess: () => reset(),
         });
     }
 
@@ -57,18 +75,17 @@ export default function Classroom({ classroom, assignments, ...props }) {
                 assignment: selectedAssignmentId,
             }),
             {
-                preserveScroll: true,
-                onSuccess: () => form.reset("title"),
+                onSuccess: () => reset(),
             }
         );
     }
 
     function addMaterialSubmit(e) {
         e.preventDefault();
-        post(route("material.add", { classroom: classroom.id }));
+        post(route("material.add", { classroom: classroom.id }), {
+            onSuccess: () => reset(),
+        });
     }
-
-    console.log(data, assignments, classroom);
 
     return (
         <Authenticated
@@ -162,12 +179,18 @@ export default function Classroom({ classroom, assignments, ...props }) {
                         </ul>
                     </div>
 
-                    {classroom.banner_image_file_path != null && (
-                        <img
-                            class="object-cover w-full h-72 rounded-lg shadow"
-                            src={`/${classroom.banner_image_file_path}`}
-                            alt="Classroom Banner"
-                        />
+                    {bannerImage != null && (
+                        <div className="relative w-full h-72">
+                            {!bannerLoaded && (
+                                <Skeleton className="absolute top-0 left-0 w-full h-72" />
+                            )}
+                            <img
+                                class="absolute top-0 left-0 object-cover rounded-lg shadow w-full h-72"
+                                src={bannerImage}
+                                alt="Classroom Banner"
+                                onLoad={() => setBannerLoaded(true)}
+                            />
+                        </div>
                     )}
                 </>
             }
@@ -236,16 +259,11 @@ export default function Classroom({ classroom, assignments, ...props }) {
                                                             <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-primary-900">
                                                                 {index + 1}
                                                             </td>
-                                                            <td class="text-sm text-primary-900 font-light px-4 py-4 whitespace-nowrap">
-                                                                <img
-                                                                    class="inline object-cover w-8 h-8 rounded-full mr-4"
-                                                                    src={
-                                                                        attendee.profile_image_file_path !=
-                                                                        null
-                                                                            ? `/${attendee.profile_image_file_path}`
-                                                                            : avatarImage
+                                                            <td class="flex items-center text-sm text-primary-900 font-light px-4 py-4 whitespace-nowrap">
+                                                                <AttendeeAvatar
+                                                                    attendee={
+                                                                        attendee
                                                                     }
-                                                                    alt="Profile image"
                                                                 />
                                                                 {`${
                                                                     attendee.name
@@ -378,18 +396,11 @@ export default function Classroom({ classroom, assignments, ...props }) {
                                                                     )
                                                                 </td>
                                                                 <td class="text-sm text-primary-900 font-light px-4 py-4 whitespace-nowrap flex">
-                                                                    <a
-                                                                        href={`/${assignment.assignment_file_path}`}
-                                                                        target="_blank"
-                                                                    >
-                                                                        <FontAwesomeIcon
-                                                                            icon={
-                                                                                faDownload
-                                                                            }
-                                                                            size="lg"
-                                                                            className="text-primary"
-                                                                        />
-                                                                    </a>
+                                                                    <DownloadButton
+                                                                        filePath={
+                                                                            assignment.assignment_file_path
+                                                                        }
+                                                                    />
                                                                     {classroom
                                                                         .class_attendees[0]
                                                                         .id ==
@@ -571,18 +582,11 @@ export default function Classroom({ classroom, assignments, ...props }) {
                                                                     }
                                                                 </td>
                                                                 <td class="text-sm text-primary-900 font-light px-4 py-4 whitespace-nowrap flex">
-                                                                    <a
-                                                                        href={`/${material.material_file_path}`}
-                                                                        target="_blank"
-                                                                    >
-                                                                        <FontAwesomeIcon
-                                                                            icon={
-                                                                                faDownload
-                                                                            }
-                                                                            size="lg"
-                                                                            className="text-primary"
-                                                                        />
-                                                                    </a>
+                                                                    <DownloadButton
+                                                                        filePath={
+                                                                            material.material_file_path
+                                                                        }
+                                                                    />
                                                                     {classroom
                                                                         .class_attendees[0]
                                                                         .id ==
@@ -997,7 +1001,7 @@ export default function Classroom({ classroom, assignments, ...props }) {
                     aria-modal="true"
                     role="dialog"
                 >
-                    <div className="modal-dialog modal-dialog-centered relative max-w-7xl pointer-events-none">
+                    <div className="modal-dialog modal-dialog-centered relative max-w-7xl m-5 pointer-events-none">
                         <div className="modal-content border-none shadow-lg relative flex flex-col w-full pointer-events-auto bg-white bg-clip-padding rounded-md outline-none text-current">
                             <div className="modal-header flex flex-shrink-0 items-center justify-between p-4 border-b border-gray-200 rounded-t-md">
                                 <h5
@@ -1109,18 +1113,11 @@ export default function Classroom({ classroom, assignments, ...props }) {
                                                                             )
                                                                         </td>
                                                                         <td class="text-sm text-primary-900 font-light px-4 py-4 whitespace-nowrap">
-                                                                            <a
-                                                                                href={`/${submission.submission_file_path}`}
-                                                                                target="_blank"
-                                                                            >
-                                                                                <FontAwesomeIcon
-                                                                                    icon={
-                                                                                        faDownload
-                                                                                    }
-                                                                                    size="lg"
-                                                                                    className="text-primary"
-                                                                                />
-                                                                            </a>
+                                                                            <DownloadButton
+                                                                                filePath={
+                                                                                    submission.submission_file_path
+                                                                                }
+                                                                            />
                                                                         </td>
                                                                     </tr>
                                                                 )
@@ -1156,7 +1153,7 @@ export default function Classroom({ classroom, assignments, ...props }) {
                     aria-modal="true"
                     role="dialog"
                 >
-                    <div className="modal-dialog modal-dialog-centered relative max-w-7xl pointer-events-none">
+                    <div className="modal-dialog modal-dialog-centered relative max-w-7xl m-5 pointer-events-none">
                         <div className="modal-content border-none shadow-lg relative flex flex-col w-full pointer-events-auto bg-white bg-clip-padding rounded-md outline-none text-current">
                             <div className="modal-header flex flex-shrink-0 items-center justify-between p-4 border-b border-gray-200 rounded-t-md">
                                 <h5
@@ -1249,18 +1246,13 @@ export default function Classroom({ classroom, assignments, ...props }) {
                                                                         <td class="text-sm text-primary-900 font-light px-4 py-4 whitespace-nowrap">
                                                                             {index ==
                                                                                 0 && (
-                                                                                <a
-                                                                                    href={`/${submission.submission.submission_file_path}`}
-                                                                                    target="_blank"
-                                                                                >
-                                                                                    <FontAwesomeIcon
-                                                                                        icon={
-                                                                                            faDownload
-                                                                                        }
-                                                                                        size="lg"
-                                                                                        className="text-primary"
-                                                                                    />
-                                                                                </a>
+                                                                                <DownloadButton
+                                                                                    filePath={
+                                                                                        submission
+                                                                                            .submission
+                                                                                            .submission_file_path
+                                                                                    }
+                                                                                />
                                                                             )}
                                                                         </td>
                                                                     </tr>

@@ -8,7 +8,6 @@ use App\Models\Assignment;
 use App\Models\Submission;
 use App\Models\SubmissionHistory;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 
 class SubmissionController extends Controller
 {
@@ -32,10 +31,23 @@ class SubmissionController extends Controller
 
         $submission = Submission::where('user_id', Auth::id())->where('assignment_id', $assignmentId)->first();
 
+        $bucket = app('firebase.storage')->getBucket();
+        $storage_path = 'submissions/';
+        $submissionFile = $request->file('submission');
+        $submission_file_name = 'submission-' . $attrs['title'] . '-' . time() . '.' . $submissionFile->getClientOriginalExtension();
+        $submission_file_path =  $storage_path . $submission_file_name;
+        $localfolder = public_path('firebase-temp-uploads') . '/';
+
         if ($submission == null) {
-            $new_submission = $request->file('submission');
-            $submission_file_path = 'submission-' . $attrs['title'] . '-' . time() . '.' . $new_submission->getClientOriginalExtension();
-            $submission_file_path = $new_submission->storeAs('submissions', $submission_file_path);
+            if ($submissionFile->move($localfolder, $submission_file_name)) {
+                $uploadedfile = fopen($localfolder . $submission_file_name, 'r');
+
+                $bucket->upload($uploadedfile, ['name' => $submission_file_path]);
+
+                unlink($localfolder . $submission_file_name);  
+            } else {
+                abort(500);
+            }
 
             $submission = Submission::create([
                 'title' => $attrs['title'],
@@ -44,13 +56,22 @@ class SubmissionController extends Controller
                 'assignment_id' => $assignmentId
             ]);
         } else {
-            if (Storage::exists($submission->submission_file_path)) {
-                Storage::delete($submission->submission_file_path);
+            if ($submission->submission_file_path != NULL) {
+                $file = $bucket->object($submission->submission_file_path);
+                if ($file->exists()) {
+                    $file->delete();
+                }
             }
 
-            $new_submission = $request->file('submission');
-            $submission_file_path = 'submission-' . $attrs['title'] . '-' . time() . '.' . $new_submission->getClientOriginalExtension();
-            $submission_file_path = $new_submission->storeAs('submissions', $submission_file_path);
+            if ($submissionFile->move($localfolder, $submission_file_name)) {
+                $uploadedfile = fopen($localfolder . $submission_file_name, 'r');
+
+                $bucket->upload($uploadedfile, ['name' => $submission_file_path]);
+
+                unlink($localfolder . $submission_file_name);  
+            } else {
+                abort(500);
+            }
 
             $submission->update([
                 'title' => $attrs['title'],
@@ -82,9 +103,16 @@ class SubmissionController extends Controller
     public function destroy($submissionId)
     {
         $submission = Submission::find($submissionId);
-        if (Storage::exists($submission->submission_file_path)) {
-            Storage::delete($submission->submission_file_path);
+        
+        $bucket = app('firebase.storage')->getBucket();
+
+        if ($submission->submission_file_path != NULL) {
+            $file = $bucket->object($submission->submission_file_path);
+            if ($file->exists()) {
+                $file->delete();
+            }
         }
+
         $submission->delete();
 
         return response([

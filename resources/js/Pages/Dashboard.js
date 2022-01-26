@@ -8,6 +8,7 @@ import FloatingLabelInput from "@/Components/FloatingLabelInput";
 import Button from "@/Components/Button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
+import ClassCard from "@/Components/ClassCard";
 
 export default function Dashboard({ user, ...props }) {
     const [classrooms] = useState(user.attended_classes);
@@ -22,12 +23,16 @@ export default function Dashboard({ user, ...props }) {
 
     function createClassroomSubmit(e) {
         e.preventDefault();
-        post(route("classroom.create"));
+        post(route("classroom.create"), {
+            onSuccess: () => reset(),
+        });
     }
 
     function joinClassroomSubmit(e) {
         e.preventDefault();
-        post(route("classroom.join"));
+        post(route("classroom.join"), {
+            onSuccess: () => reset(),
+        });
     }
 
     return (
@@ -90,26 +95,8 @@ export default function Dashboard({ user, ...props }) {
             ) : (
                 <div className="flex w-screen md:px-8 px-6 py-10 flex-wrap justify-center md:justify-start">
                     {classrooms.map((classroom) => (
-                        <div className="flex justify-center md:mr-5">
-                            <Link href={`/classrooms/${classroom.id}`}>
-                                <div className="rounded-md shadow-sm bg-white md:w-64 w-full">
-                                    <img
-                                        className="rounded-t-lg object-cover md:h-48 w-full"
-                                        src={
-                                            classroom.banner_image_file_path !=
-                                            null
-                                                ? `/${classroom.banner_image_file_path}`
-                                                : thumbnailImage
-                                        }
-                                        alt=""
-                                    />
-                                    <div className="p-6 text-center">
-                                        <h5 className="text-gray-900 text-xs font-medium">
-                                            {classroom.name}
-                                        </h5>
-                                    </div>
-                                </div>
-                            </Link>
+                        <div className="flex justify-center md:mr-5 mr-0 md:mb-0 mb-5 flex-col md:flex-row md:flex-wrap md:w-64 w-full">
+                            <ClassCard classroom={classroom} />
                         </div>
                     ))}
                 </div>
@@ -317,10 +304,10 @@ export default function Dashboard({ user, ...props }) {
                                     Invite Code
                                 </FloatingLabelInput>
                             </div>
-                            <div className="modal-footer flex flex-shrink-0 flex-wrap items-center justify-between p-4 border-t border-gray-200 rounded-b-md">
+                            <div className="modal-footer flex flex-shrink-0 flex-wrap items-center justify-between p-4 md:pt-4 pt-0 border-t border-gray-200 rounded-b-md">
                                 <button
                                     type="button"
-                                    className="inline-block bg-transparent pr-8 text-primary-600 font-medium text-xs leading-tight rounded hover:text-primary-700 focus:outline-none focus:ring-0 transition duration-150 ease-in-out"
+                                    className="inline-block bg-transparent mb-5 md:mb-0 pr-8 text-primary-600 font-medium text-xs leading-tight rounded hover:text-primary-700 focus:outline-none focus:ring-0 transition duration-150 ease-in-out"
                                     data-bs-toggle="modal"
                                     data-bs-target="#createClassModal"
                                 >

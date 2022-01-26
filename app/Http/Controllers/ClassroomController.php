@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 use App\Models\Classroom;
 use App\Models\Assignment;
 use App\Models\Submission;
@@ -42,12 +41,36 @@ class ClassroomController extends Controller
             ]);
 
             if (request()->hasFile('banner')) {
-                if (Storage::exists($classroom->banner_image_file_path)) {
-                    Storage::delete($classroom->banner_image_file_path);
+                $bucket = app('firebase.storage')->getBucket();
+
+                if ($classroom->banner_image_file_path != NULL) {
+                    $banner_image = $bucket->object($classroom->banner_image_file_path);
+                    if ($banner_image->exists()) {
+                        $banner_image->delete();
+                    }
                 }
+
+                $storage_path = 'banner-images/';
                 $banner_image = $request->file('banner');
-                $banner_image_file_path = 'banner-image-' . $classroom->id . '-' . time() . '.' . $banner_image->getClientOriginalExtension();
-                $banner_image_file_path = $banner_image->storeAs('banner-images', $banner_image_file_path);
+                $banner_image_file_name = 'banner-image-' . $classroom->id . '-' . time() . '.' . $banner_image->getClientOriginalExtension();
+                $banner_image_file_path =  $storage_path . $banner_image_file_name;
+
+                $localfolder = public_path('firebase-temp-uploads') . '/';
+
+                if ($banner_image->move($localfolder, $banner_image_file_name)) {
+                    $uploadedfile = fopen($localfolder . $banner_image_file_name, 'r');
+
+                    $bucket->upload($uploadedfile, ['name' => $banner_image_file_path]);
+
+                    unlink($localfolder . $banner_image_file_name);  
+
+                    $classroom->update([
+                        'banner_image_file_path' => $banner_image_file_path
+                    ]);
+                } else {
+                    abort(500);
+                }
+
                 $classroom->update([
                     'banner_image_file_path' => $banner_image_file_path
                 ]);
@@ -64,9 +87,23 @@ class ClassroomController extends Controller
             'deadline' => 'required'
         ]);
 
+        $bucket = app('firebase.storage')->getBucket();
+        $storage_path = 'assignments/';
         $assignment = $request->file('assignment');
-        $assignment_file_path = 'assignment-' . $attrs['title'] . '-' . time() . '.' . $assignment->getClientOriginalExtension();
-        $assignment_file_path = $assignment->storeAs('assignments', $assignment_file_path);
+        $assignment_file_name = 'assignment-' . $attrs['title'] . '-' . time() . '.' . $assignment->getClientOriginalExtension();
+        $assignment_file_path =  $storage_path . $assignment_file_name;
+
+        $localfolder = public_path('firebase-temp-uploads') . '/';
+
+        if ($assignment->move($localfolder, $assignment_file_name)) {
+            $uploadedfile = fopen($localfolder . $assignment_file_name, 'r');
+
+            $bucket->upload($uploadedfile, ['name' => $assignment_file_path]);
+
+            unlink($localfolder . $assignment_file_name);
+        } else {
+            abort(500);
+        }
 
         $assignment = Assignment::create([
             'title' => $attrs['title'],
@@ -81,9 +118,16 @@ class ClassroomController extends Controller
     public function deleteAssignment($assignmentId)
     {
         $assignment = Assignment::find($assignmentId);
-        if (Storage::exists($assignment->assignment_file_path)) {
-            Storage::delete($assignment->assignment_file_path);
+
+        $bucket = app('firebase.storage')->getBucket();
+
+        if ($assignment->assignment_file_path != NULL) {
+            $file = $bucket->object($assignment->assignment_file_path);
+            if ($file->exists()) {
+                $file->delete();
+            }
         }
+
         $assignment->delete();
 
         return redirect()->back()->with('message', 'Assignment deleted!');
@@ -97,10 +141,23 @@ class ClassroomController extends Controller
 
         $submission = Submission::where('user_id', Auth::id())->where('assignment_id', $assignmentId)->first();
 
+        $bucket = app('firebase.storage')->getBucket();
+        $storage_path = 'submissions/';
+        $submissionFile = $request->file('submission');
+        $submission_file_name = 'submission-' . $attrs['title'] . '-' . time() . '.' . $submissionFile->getClientOriginalExtension();
+        $submission_file_path =  $storage_path . $submission_file_name;
+        $localfolder = public_path('firebase-temp-uploads') . '/';
+
         if ($submission == null) {
-            $new_submission = $request->file('submission');
-            $submission_file_path = 'submission-' . $attrs['title'] . '-' . time() . '.' . $new_submission->getClientOriginalExtension();
-            $submission_file_path = $new_submission->storeAs('submissions', $submission_file_path);
+            if ($submissionFile->move($localfolder, $submission_file_name)) {
+                $uploadedfile = fopen($localfolder . $submission_file_name, 'r');
+
+                $bucket->upload($uploadedfile, ['name' => $submission_file_path]);
+
+                unlink($localfolder . $submission_file_name);  
+            } else {
+                abort(500);
+            }
 
             $submission = Submission::create([
                 'title' => $attrs['title'],
@@ -109,13 +166,20 @@ class ClassroomController extends Controller
                 'assignment_id' => $assignmentId
             ]);
         } else {
-            if (Storage::exists($submission->submission_file_path)) {
-                Storage::delete($submission->submission_file_path);
+            if ($submission->submission_file_path != NULL) {
+                $file = $bucket->object($submission->submission_file_path);
+                if ($file->exists()) {
+                    $file->delete();
+                }
             }
 
-            $new_submission = $request->file('submission');
-            $submission_file_path = 'submission-' . $attrs['title'] . '-' . time() . '.' . $new_submission->getClientOriginalExtension();
-            $submission_file_path = $new_submission->storeAs('submissions', $submission_file_path);
+            if ($submissionFile->move($localfolder, $submission_file_name)) {
+                $uploadedfile = fopen($localfolder . $submission_file_name, 'r');
+
+                $bucket->upload($uploadedfile, ['name' => $submission_file_path]);
+            } else {
+                abort(500);
+            }
 
             $submission->update([
                 'title' => $attrs['title'],
@@ -141,9 +205,23 @@ class ClassroomController extends Controller
             'title' => 'required|max:255',
         ]);
 
+        $bucket = app('firebase.storage')->getBucket();
+        $storage_path = 'materials/';
         $material = $request->file('material');
-        $material_file_path = 'material-' . $attrs['title'] . '-' . time() . '.' . $material->getClientOriginalExtension();
-        $material_file_path = $material->storeAs('materials', $material_file_path);
+        $material_file_name = 'material-' . $attrs['title'] . '-' . time() . '.' . $material->getClientOriginalExtension();
+        $material_file_path =  $storage_path . $material_file_name;
+
+        $localfolder = public_path('firebase-temp-uploads') . '/';
+
+        if ($material->move($localfolder, $material_file_name)) {
+            $uploadedfile = fopen($localfolder . $material_file_name, 'r');
+
+            $bucket->upload($uploadedfile, ['name' => $material_file_path]);
+
+            unlink($localfolder . $material_file_name);
+        } else {
+            abort(500);
+        }
 
         $material = Material::create([
             'title' => $attrs['title'],
@@ -157,9 +235,16 @@ class ClassroomController extends Controller
     public function deleteMaterial($materialId)
     {
         $material = Material::find($materialId);
-        if (Storage::exists($material->material_file_path)) {
-            Storage::delete($material->material_file_path);
+
+        $bucket = app('firebase.storage')->getBucket();
+
+        if ($material->material_file_path != NULL) {
+            $file = $bucket->object($material->material_file_path);
+            if ($file->exists()) {
+                $file->delete();
+            }
         }
+
         $material->delete();
 
         return redirect()->back()->with('message', 'Material deleted!');

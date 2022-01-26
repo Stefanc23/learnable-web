@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Classroom;
 use App\Models\Material;
-use Illuminate\Support\Facades\Storage;
 
 class MaterialController extends Controller
 {
@@ -23,9 +22,23 @@ class MaterialController extends Controller
             'title' => 'required|max:255',
         ]);
 
+        $bucket = app('firebase.storage')->getBucket();
+        $storage_path = 'materials/';
         $material = $request->file('material');
-        $material_file_path = 'material-' . $attrs['title'] . '-' . time() . '.' . $material->getClientOriginalExtension();
-        $material_file_path = $material->storeAs('materials', $material_file_path);
+        $material_file_name = 'material-' . $attrs['title'] . '-' . time() . '.' . $material->getClientOriginalExtension();
+        $material_file_path =  $storage_path . $material_file_name;
+
+        $localfolder = public_path('firebase-temp-uploads') . '/';
+
+        if ($material->move($localfolder, $material_file_name)) {
+            $uploadedfile = fopen($localfolder . $material_file_name, 'r');
+
+            $bucket->upload($uploadedfile, ['name' => $material_file_path]);
+
+            unlink($localfolder . $material_file_name);
+        } else {
+            abort(500);
+        }
 
         $material = Material::create([
             'title' => $attrs['title'],
@@ -48,9 +61,16 @@ class MaterialController extends Controller
     public function destroy($materialId)
     {
         $material = Material::find($materialId);
-        if (Storage::exists($material->material_file_path)) {
-            Storage::delete($material->material_file_path);
+        
+        $bucket = app('firebase.storage')->getBucket();
+
+        if ($material->material_file_path != NULL) {
+            $file = $bucket->object($material->material_file_path);
+            if ($file->exists()) {
+                $file->delete();
+            }
         }
+        
         $material->delete();
 
         return response([

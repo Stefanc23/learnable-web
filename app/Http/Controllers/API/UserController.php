@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Storage;
 use App\Models\User;
 
 class UserController extends Controller
@@ -41,12 +40,36 @@ class UserController extends Controller
         ]);
 
         if (request()->hasFile('profile')) {
-            if (Storage::exists($user->profile_image_file_path)) {
-                Storage::delete($user->profile_image_file_path);
+            $bucket = app('firebase.storage')->getBucket();
+
+            if ($user->profile_image_file_path != NULL) {
+                $profile_image = $bucket->object($user->profile_image_file_path);
+                if ($profile_image->exists()) {
+                    $profile_image->delete();
+                }
             }
+
+            $storage_path = 'profile-images/';
             $profile_image = $request->file('profile');
             $profile_image_file_name = 'profile-image-' . $user->id . '-' . time() . '.' . $profile_image->getClientOriginalExtension();
-            $profile_image_file_path = $profile_image->storeAs('profile-images', $profile_image_file_name);
+            $profile_image_file_path =  $storage_path . $profile_image_file_name;
+
+            $localfolder = public_path('firebase-temp-uploads') . '/';
+
+            if ($profile_image->move($localfolder, $profile_image_file_name)) {
+                $uploadedfile = fopen($localfolder . $profile_image_file_name, 'r');
+
+                $bucket->upload($uploadedfile, ['name' => $profile_image_file_path]);
+
+                unlink($localfolder . $profile_image_file_name);  
+
+                $user->update([
+                    'profile_image_file_path' => $profile_image_file_path
+                ]);
+            } else {
+                abort(500);
+            }
+            
             $user->update([
                 'profile_image_file_path' => $profile_image_file_path
             ]);

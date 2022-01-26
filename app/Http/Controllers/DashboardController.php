@@ -37,12 +37,27 @@ class DashboardController extends Controller
         ]);
 
         if (request()->hasFile('banner')) {
+            $bucket = app('firebase.storage')->getBucket();
+            $storage_path = 'banner-images/';
             $banner_image = $request->file('banner');
-            $banner_image_file_path = 'banner-image-' . $classroom->id . '-' . time() . '.' . $banner_image->getClientOriginalExtension();
-            $banner_image_file_path = $banner_image->storeAs('banner-images', $banner_image_file_path);
-            $classroom->update([
-                'banner_image_file_path' => $banner_image_file_path
-            ]);
+            $banner_image_file_name = 'banner-image-' . $classroom->id . '-' . time() . '.' . $banner_image->getClientOriginalExtension();
+            $banner_image_file_path =  $storage_path . $banner_image_file_name;
+
+            $localfolder = public_path('firebase-temp-uploads') . '/';
+
+            if ($banner_image->move($localfolder, $banner_image_file_name)) {
+                $uploadedfile = fopen($localfolder . $banner_image_file_name, 'r');
+
+                $bucket->upload($uploadedfile, ['name' => $banner_image_file_path]);
+
+                unlink($localfolder . $banner_image_file_name);  
+
+                $classroom->update([
+                    'banner_image_file_path' => $banner_image_file_path
+                ]);
+            } else {
+                abort(500);
+            }
         }
 
         return redirect()->back()->with('message', 'Class created.');;

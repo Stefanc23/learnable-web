@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Authenticated from "@/Layouts/Authenticated";
 import { Head, useForm } from "@inertiajs/inertia-react";
 import { avatarImage } from "@/images";
@@ -6,32 +6,45 @@ import "tw-elements";
 import ValidationErrors from "@/Components/ValidationErrors";
 import FloatingLabelInput from "@/Components/FloatingLabelInput";
 import Button from "@/Components/Button";
+import storage from "@/firebase";
 
 export default function Profile({ user, ...props }) {
     const [selectedAvatar, setSelectedAvatar] = useState(null);
+    const [profileImage, setProfileImage] = useState(null);
+    const [loaded, setLoaded] = useState(false);
 
-    const { data, setData, post, progress, processing, errors, reset } =
-        useForm({
-            name: user.name,
-            email: user.email,
-            phone_number: user.phone_number,
-            date_of_birth: user.date_of_birth,
-            gender: user.gender,
-            profile: null,
-            current_passwprd: "",
-            new_password: "",
-            new_password_confirmation: "",
-        });
+    const { data, setData, post, processing, errors, reset } = useForm({
+        name: user.name,
+        email: user.email,
+        phone_number: user.phone_number,
+        date_of_birth: user.date_of_birth,
+        gender: user.gender,
+        profile: null,
+        current_passwprd: "",
+        new_password: "",
+        new_password_confirmation: "",
+    });
 
     function updateProfileSubmit(e) {
         e.preventDefault();
-        post(route("user.update"));
+        post(route("user.update"), { onSuccess: () => reset() });
     }
 
     function changePasswordSubmit(e) {
         e.preventDefault();
-        post(route("user.password"));
+        post(route("user.password", { onSuccess: () => reset() }));
     }
+
+    useEffect(() => {
+        if (user.profile_image_file_path != null) {
+            storage
+                .ref(user.profile_image_file_path)
+                .getDownloadURL()
+                .then((url) => {
+                    setProfileImage(url);
+                });
+        }
+    }, [user]);
 
     return (
         <Authenticated
@@ -70,16 +83,18 @@ export default function Profile({ user, ...props }) {
                                     <div className="grid grid-cols-6 gap-6">
                                         <div className="col-span-6 flex flex-col justify-center items-center">
                                             <img
-                                                class="inline object-cover w-16 h-16 rounded-full"
+                                                className="inline object-cover w-16 h-16 rounded-full"
+                                                style={loaded ? {} : {visibility: 'hidden'}}
                                                 src={
                                                     selectedAvatar != null
                                                         ? selectedAvatar
                                                         : user.profile_image_file_path !=
                                                           null
-                                                        ? `/${user.profile_image_file_path}`
+                                                        ? profileImage
                                                         : avatarImage
                                                 }
                                                 alt="Profile image"
+                                                onLoad={() => setLoaded(true)}
                                             />
                                             <label
                                                 for="profile"

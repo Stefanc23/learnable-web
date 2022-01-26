@@ -7,7 +7,6 @@ use Illuminate\Http\Request;
 use App\Models\Classroom;
 use App\Models\ClassAttendee;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 
 class ClassroomController extends Controller
 {
@@ -37,9 +36,28 @@ class ClassroomController extends Controller
         ]);
 
         if (request()->hasFile('banner')) {
+            $bucket = app('firebase.storage')->getBucket();
+            $storage_path = 'banner-images/';
             $banner_image = $request->file('banner');
-            $banner_image_file_path = 'banner-image-' . $classroom->id . '-' . time() . '.' . $banner_image->getClientOriginalExtension();
-            $banner_image_file_path = $banner_image->storeAs('banner-images', $banner_image_file_path);
+            $banner_image_file_name = 'banner-image-' . $classroom->id . '-' . time() . '.' . $banner_image->getClientOriginalExtension();
+            $banner_image_file_path =  $storage_path . $banner_image_file_name;
+
+            $localfolder = public_path('firebase-temp-uploads') . '/';
+
+            if ($banner_image->move($localfolder, $banner_image_file_name)) {
+                $uploadedfile = fopen($localfolder . $banner_image_file_name, 'r');
+
+                $bucket->upload($uploadedfile, ['name' => $banner_image_file_path]);
+
+                unlink($localfolder . $banner_image_file_name);
+
+                $classroom->update([
+                    'banner_image_file_path' => $banner_image_file_path
+                ]);
+            } else {
+                abort(500);
+            }
+
             $classroom->update([
                 'banner_image_file_path' => $banner_image_file_path
             ]);
@@ -72,12 +90,36 @@ class ClassroomController extends Controller
         ]);
 
         if (request()->hasFile('banner')) {
-            if (Storage::exists($classroom->banner_image_file_path)) {
-                Storage::delete($classroom->banner_image_file_path);
+            $bucket = app('firebase.storage')->getBucket();
+
+            if ($classroom->banner_image_file_path != NULL) {
+                $banner_image = $bucket->object($classroom->banner_image_file_path);
+                if ($banner_image->exists()) {
+                    $banner_image->delete();
+                }
             }
+
+            $storage_path = 'banner-images/';
             $banner_image = $request->file('banner');
-            $banner_image_file_path = 'banner-image-' . $classroom->id . '-' . time() . '.' . $banner_image->getClientOriginalExtension();
-            $banner_image_file_path = $banner_image->storeAs('banner-images', $banner_image_file_path);
+            $banner_image_file_name = 'banner-image-' . $classroom->id . '-' . time() . '.' . $banner_image->getClientOriginalExtension();
+            $banner_image_file_path =  $storage_path . $banner_image_file_name;
+
+            $localfolder = public_path('firebase-temp-uploads') . '/';
+
+            if ($banner_image->move($localfolder, $banner_image_file_name)) {
+                $uploadedfile = fopen($localfolder . $banner_image_file_name, 'r');
+
+                $bucket->upload($uploadedfile, ['name' => $banner_image_file_path]);
+
+                unlink($localfolder . $banner_image_file_name);
+
+                $classroom->update([
+                    'banner_image_file_path' => $banner_image_file_path
+                ]);
+            } else {
+                abort(500);
+            }
+
             $classroom->update([
                 'banner_image_file_path' => $banner_image_file_path
             ]);
@@ -97,9 +139,15 @@ class ClassroomController extends Controller
         }
 
         $classroom =  Classroom::find($classroomId);
-        if (Storage::exists($classroom->banner_image_file_path)) {
-            Storage::delete($classroom->banner_image_file_path);
+        $bucket = app('firebase.storage')->getBucket();
+
+        if ($classroom->banner_image_file_path != NULL) {
+            $banner_image = $bucket->object($classroom->banner_image_file_path);
+            if ($banner_image->exists()) {
+                $banner_image->delete();
+            }
         }
+
         $classroom->delete();
 
         return response([
